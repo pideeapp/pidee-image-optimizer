@@ -2,21 +2,9 @@ const express = require("express");
 const multer = require("multer");
 const sharp = require("sharp");
 const cors = require("cors");
-const admin = require("firebase-admin");
-const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 app.use(cors());
-
-// 🔐 Inicializar Firebase (usa variable de entorno en Railway)
-admin.initializeApp({
-  credential: admin.credential.cert(
-    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  ),
-  storageBucket: "barber-5ec94.appspot.com"
-});
-
-const bucket = admin.storage().bucket();
 
 const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 }
@@ -44,25 +32,12 @@ app.post("/optimize", upload.single("image"), async (req, res) => {
 
     } while (optimizedImage.length > 150 * 1024 && quality > 30);
 
-    // 🔥 Subir a Firebase
-    const fileName = `media/${uuidv4()}.webp`;
-    const file = bucket.file(fileName);
-    const token = uuidv4();
-
-    await file.save(optimizedImage, {
-      metadata: {
-        contentType: "image/webp",
-        metadata: {
-          firebaseStorageDownloadTokens: token,
-        },
-      },
-    });
-
-    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+    // 🔥 Convertimos a Base64
+    const base64Image = optimizedImage.toString("base64");
 
     res.json({
       success: true,
-      url: publicUrl,
+      base64: base64Image,
       size: optimizedImage.length
     });
 
