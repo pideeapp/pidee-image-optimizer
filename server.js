@@ -1,25 +1,24 @@
 const express = require("express");
-const multer = require("multer");
 const sharp = require("sharp");
 const cors = require("cors");
 
 const app = express();
 app.use(cors());
 
-const upload = multer({
-  limits: { fileSize: 15 * 1024 * 1024 }
-});
+// Recibir imagen como raw binary
+app.use(express.raw({ type: "*/*", limit: "15mb" }));
 
-app.post("/optimize", upload.single("image"), async (req, res) => {
+app.post("/optimize", async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No image provided" });
+
+    if (!req.body || req.body.length === 0) {
+      return res.status(400).json({ error: "No image received" });
     }
 
     let quality = 80;
     let optimizedImage;
 
-    const resized = sharp(req.file.buffer)
+    const resized = sharp(req.body)
       .resize({ width: 1080, withoutEnlargement: true });
 
     do {
@@ -29,17 +28,10 @@ app.post("/optimize", upload.single("image"), async (req, res) => {
         .toBuffer();
 
       quality -= 5;
-
     } while (optimizedImage.length > 150 * 1024 && quality > 30);
 
-    // 🔥 Convertimos a Base64
-    const base64Image = optimizedImage.toString("base64");
-
-    res.json({
-      success: true,
-      base64: base64Image,
-      size: optimizedImage.length
-    });
+    res.set("Content-Type", "image/webp");
+    res.send(optimizedImage);
 
   } catch (error) {
     console.error(error);
